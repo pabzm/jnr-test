@@ -1,7 +1,6 @@
 // jQuery-Selektoren für alle DOM-Elemente
 const $game             = $("#game");
 const $character        = $("#character");
-const $block            = $("#block");
 const $scoreSpan        = $("#scoreSpan");
 const $startMenu        = $("#startMenu");
 const $pauseMenu        = $("#pauseMenu");
@@ -15,8 +14,8 @@ const $startHighScoreEl = $("#startHighScore");
 const $pauseHighScoreEl = $("#pauseHighScore");
 
 // Native DOM-Referenzen für direkte Animationssteuerung
-const block     = $block[0];
 const character = $character[0];
+const gameEl    = $game[0];
 
 let counter = 0;
 let score = 0;
@@ -26,12 +25,9 @@ let isPaused = false;
 let isResuming = false;
 let resumeTimerId = null;
 let blockDelayTimerId = null;
-let blockInFlight = false;
-let blockSpeed = 1.1;
 const HIGH_SCORE_KEY = "jumpingBlockHighScore";
 const DEFAULT_HIGH_SCORE = 559;
 let highScore = 0;
-let scoredForCurrentBlock = false;
 
 function setMenuOpen(open) {
     $("body").toggleClass("menu-open", open);
@@ -52,9 +48,6 @@ function showOnly(menuToShow) {
 
 function setGameStopped(stopped) {
     $("body").toggleClass("game-stopped", stopped);
-    if (blockInFlight) {
-        block.style.animationPlayState = stopped ? "paused" : "running";
-    }
 }
 
 function cancelBlockDelay() {
@@ -64,30 +57,29 @@ function cancelBlockDelay() {
     }
 }
 
-// Startet den Block mit konstanter Geschwindigkeit (steigt alle 20 Blöcke)
+// Erstellt einen neuen Block und startet seine Animation; plant sofort den nächsten ein
 function launchBlock() {
-    blockInFlight = true;
     // Animationsdauer sinkt alle 20 Blöcke um 0.1 s (Minimum: 0.5 s)
-    blockSpeed = Math.max(0.5, 1.2 - Math.floor(score / 20) * 0.1);
-    block.style.animation = "none";
-    block.style.left = "100%";
-    void block.offsetHeight; // Reflow erzwingen
-    block.style.animation = "block " + blockSpeed + "s linear";
-    block.style.animationPlayState = (isPaused || !isRunning || isResuming) ? "paused" : "running";
+    const speed = Math.max(0.5, 1.2 - Math.floor(score / 20) * 0.1);
+    const el = document.createElement("div");
+    el.className = "block";
+    el.setAttribute("aria-hidden", "true");
+    el.style.animation = "block " + speed + "s linear";
+    el.style.animationPlayState = (isPaused || !isRunning || isResuming) ? "paused" : "running";
+    gameEl.appendChild(el);
+    el.addEventListener("animationend", () => { el.remove(); });
+    // Nächsten Block einplanen, sobald dieser startet
+    scheduleNextBlock();
 }
 
 // Plant den nächsten Block mit zufälliger Verzögerung ein
 function scheduleNextBlock() {
-    blockInFlight = false;
-    scoredForCurrentBlock = false;
     cancelBlockDelay();
-    block.style.animation = "none";
-    block.style.left = "100%";
 
     if (!isRunning || gameOver || isPaused || isResuming) return;
 
-    // Zufällige Verzögerung: 300 ms – 1000 ms
-    const delay = Math.floor(Math.random() * 700) + 300;
+    // Zufällige Verzögerung: 200 ms – 600 ms
+    const delay = Math.floor(Math.random() * 400) + 200;
     blockDelayTimerId = setTimeout(() => {
         blockDelayTimerId = null;
         if (!isRunning || gameOver || isPaused || isResuming) return;
@@ -98,9 +90,6 @@ function scheduleNextBlock() {
 function setPausedState(paused) {
     isPaused = paused;
     $("body").toggleClass("game-paused", paused);
-    if (blockInFlight) {
-        block.style.animationPlayState = paused ? "paused" : "running";
-    }
     if (paused) {
         cancelBlockDelay();
     }
@@ -108,10 +97,7 @@ function setPausedState(paused) {
 
 function resetBlockToStart() {
     cancelBlockDelay();
-    blockInFlight = false;
-    scoredForCurrentBlock = false;
-    block.style.animation = "none";
-    block.style.left = "100%";
+    gameEl.querySelectorAll(".block").forEach(b => b.remove());
 }
 
 function overlaps(a, b) {
@@ -128,7 +114,6 @@ function overlaps(a, b) {
 function resetScore() {
     counter = 0;
     score = 0;
-    scoredForCurrentBlock = false;
     $scoreSpan.text("0");
     $finalScoreEl.text("0");
 }
@@ -170,12 +155,11 @@ function commitHighScore(candidateScore) {
     }
 }
 
-function awardPointForPassingBlock() {
-    if (scoredForCurrentBlock || !isRunning || gameOver || isPaused || isResuming) return;
+function awardPoint() {
+    if (!isRunning || gameOver || isPaused || isResuming) return;
 
     score += 1;
     counter = score * 100;
-    scoredForCurrentBlock = true;
     $scoreSpan.text(String(score));
     commitHighScore(score);
 }
@@ -235,12 +219,8 @@ function finishResume() {
     showOnly(null);
     $("body").removeClass("game-paused");
     isPaused = false;
-    // Block fortsetzen oder nächsten einplanen
-    if (blockInFlight) {
-        block.style.animationPlayState = "running";
-    } else {
-        scheduleNextBlock();
-    }
+    // Vorhandene Blöcke laufen via CSS weiter; nächsten Block einplanen
+    scheduleNextBlock();
 }
 
 function startResumeCountdown() {
@@ -251,9 +231,7 @@ function startResumeCountdown() {
     updateHighScoreDisplay();
     showOnly($pauseMenu);
     $("body").addClass("game-paused");
-    if (blockInFlight) {
-        block.style.animationPlayState = "paused";
-    }
+    // CSS pausiert automatisch alle laufenden .block-Elemente
 
     let secondsLeft = 3;
     $countdownEl.text(`Weiter in ${secondsLeft}...`);
@@ -340,26 +318,23 @@ $(document).on("keydown", (event) => {
     }
 });
 
-// Block-Animation beendet: nächsten Block mit Verzögerung einplanen
-$block.on("animationend", () => {
-    if (!isRunning || gameOver) return;
-    scheduleNextBlock();
-});
-
 // Kollisionserkennung und Punktevergabe
 window.setInterval(() => {
     if (!isRunning || gameOver || isPaused || isResuming) return;
 
-    if (overlaps(character, block)) {
-        handleGameOver();
-        return;
-    }
-
     const characterRect = character.getBoundingClientRect();
-    const blockRect = block.getBoundingClientRect();
 
-    if (!scoredForCurrentBlock && blockRect.right < characterRect.left) {
-        awardPointForPassingBlock();
+    for (const b of gameEl.querySelectorAll(".block")) {
+        if (overlaps(character, b)) {
+            handleGameOver();
+            return;
+        }
+
+        const blockRect = b.getBoundingClientRect();
+        if (!b.dataset.scored && blockRect.right < characterRect.left) {
+            b.dataset.scored = "true";
+            awardPoint();
+        }
     }
 }, 10);
 

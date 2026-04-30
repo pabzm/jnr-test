@@ -88,7 +88,7 @@ h2 {
     100% { transform: translateY(0); }
 }
 
-#block {
+.block {
     width: 40px;
     height: 40px;
     position: absolute;
@@ -109,9 +109,12 @@ h2 {
 }
 
 .game-paused #character,
-.game-paused #block,
-.game-stopped #character,
-.game-stopped #block {
+.game-stopped #character {
+    animation-play-state: paused;
+}
+
+.game-paused .block,
+.game-stopped .block {
     animation-play-state: paused;
 }
 
