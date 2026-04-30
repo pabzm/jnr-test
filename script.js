@@ -79,7 +79,7 @@ function scheduleNextBlock() {
     if (!isRunning || gameOver || isPaused || isResuming) return;
 
     // Zufällige Verzögerung: 200 ms – 600 ms
-    const delay = Math.floor(Math.random() * 401) + 200;
+    const delay = Math.floor(Math.random() * 401) + 700;
     blockDelayTimerId = setTimeout(() => {
         blockDelayTimerId = null;
         if (!isRunning || gameOver || isPaused || isResuming) return;
