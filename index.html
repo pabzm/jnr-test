@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jumping Block Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="page">
+        <h2>Jumping Block Game</h2>
+        <p class="instructions">
+             Springen: mit Leertaste oder Pfeil nach oben.
+            Mit ESC pausiert man das Spiel.
+        </p>
+
+        <div class="game" id="game" aria-label="Spielbereich">
+            <div id="character" aria-label="Spieler">
+                <img src="mario.png" alt="Spielerfigur">
+            </div>
+            <div id="block" aria-hidden="true"></div>
+
+            <div id="startMenu" class="overlay" aria-hidden="false" role="dialog" aria-modal="true">
+                <div class="menu-card">
+                    <h3>Startmenü</h3>
+                    <p>Springen: mit Leertaste oder Pfeil nach oben.<br> Pausieren: mit Escape</p>
+                    <p class="highscore">Highscore: <span id="startHighScore">0</span></p>
+                    <button id="startButton" type="button">Spiel starten</button>
+                </div>
+            </div>
+
+            <div id="pauseMenu" class="overlay hidden" aria-hidden="true" role="dialog" aria-modal="true">
+                <div class="menu-card">
+                    <h3>Pause</h3>
+                 
+                    <p class="highscore">Highscore: <span id="pauseHighScore">0</span></p>
+                    <button id="resumeButton" type="button">Weiter</button>
+                    <p id="countdown" class="countdown"></p>
+                </div>
+            </div>
+
+            <div id="gameOverMenu" class="overlay hidden" aria-hidden="true" role="dialog" aria-modal="true">
+                <div class="menu-card">
+                    <h3>Game Over</h3>
+                    <p class="final-score">Score: <span id="finalScore">0</span></p>
+                    <button id="backToStartButton" type="button">Zum Startmenü</button>
+                </div>
+            </div>
+        </div>
+
+        <p class="scoreline">Score: <span id="scoreSpan">0</span></p>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
