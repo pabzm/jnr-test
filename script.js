@@ -64,11 +64,11 @@ function cancelBlockDelay() {
     }
 }
 
-// Startet den Block mit zufälliger Geschwindigkeit
+// Startet den Block mit konstanter Geschwindigkeit (steigt alle 20 Blöcke)
 function launchBlock() {
     blockInFlight = true;
-    // Zufällige Animationsdauer: 0.7 s – 1.5 s
-    blockSpeed = 0.7 + Math.random() * 0.8;
+    // Animationsdauer sinkt alle 20 Blöcke um 0.1 s (Minimum: 0.5 s)
+    blockSpeed = Math.max(0.5, 1.2 - Math.floor(score / 20) * 0.1);
     block.style.animation = "none";
     block.style.left = "100%";
     void block.offsetHeight; // Reflow erzwingen
@@ -86,8 +86,8 @@ function scheduleNextBlock() {
 
     if (!isRunning || gameOver || isPaused || isResuming) return;
 
-    // Zufällige Verzögerung: 300 ms – 1800 ms
-    const delay = Math.floor(Math.random() * 1500) + 300;
+    // Zufällige Verzögerung: 300 ms – 1000 ms
+    const delay = Math.floor(Math.random() * 700) + 300;
     blockDelayTimerId = setTimeout(() => {
         blockDelayTimerId = null;
         if (!isRunning || gameOver || isPaused || isResuming) return;
