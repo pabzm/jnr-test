@@ -79,7 +79,7 @@ function scheduleNextBlock() {
     if (!isRunning || gameOver || isPaused || isResuming) return;
 
     // Zufällige Verzögerung: 200 ms – 600 ms
-    const delay = Math.floor(Math.random() * 400) + 200;
+    const delay = Math.floor(Math.random() * 401) + 200;
     blockDelayTimerId = setTimeout(() => {
         blockDelayTimerId = null;
         if (!isRunning || gameOver || isPaused || isResuming) return;
@@ -155,6 +155,7 @@ function commitHighScore(candidateScore) {
     }
 }
 
+// Vergib einen Punkt, wenn der Spieler einen Block passiert hat
 function awardPoint() {
     if (!isRunning || gameOver || isPaused || isResuming) return;
 
