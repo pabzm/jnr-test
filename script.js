@@ -1,17 +1,22 @@
-const game = document.getElementById("game");
-const character = document.getElementById("character");
-const block = document.getElementById("block");
-const scoreSpan = document.getElementById("scoreSpan");
-const startMenu = document.getElementById("startMenu");
-const pauseMenu = document.getElementById("pauseMenu");
-const gameOverMenu = document.getElementById("gameOverMenu");
-const startButton = document.getElementById("startButton");
-const resumeButton = document.getElementById("resumeButton");
-const backToStartButton = document.getElementById("backToStartButton");
-const countdownEl = document.getElementById("countdown");
-const finalScoreEl = document.getElementById("finalScore");
-const startHighScoreEl = document.getElementById("startHighScore");
-const pauseHighScoreEl = document.getElementById("pauseHighScore");
+// jQuery-Selektoren für alle DOM-Elemente
+const $game             = $("#game");
+const $character        = $("#character");
+const $block            = $("#block");
+const $scoreSpan        = $("#scoreSpan");
+const $startMenu        = $("#startMenu");
+const $pauseMenu        = $("#pauseMenu");
+const $gameOverMenu     = $("#gameOverMenu");
+const $startButton      = $("#startButton");
+const $resumeButton     = $("#resumeButton");
+const $backToStartButton = $("#backToStartButton");
+const $countdownEl      = $("#countdown");
+const $finalScoreEl     = $("#finalScore");
+const $startHighScoreEl = $("#startHighScore");
+const $pauseHighScoreEl = $("#pauseHighScore");
+
+// Native DOM-Referenzen für direkte Animationssteuerung
+const block     = $block[0];
+const character = $character[0];
 
 let counter = 0;
 let score = 0;
@@ -20,6 +25,8 @@ let isRunning = false;
 let isPaused = false;
 let isResuming = false;
 let resumeTimerId = null;
+let blockDelayTimerId = null;
+let blockInFlight = false;
 let blockSpeed = 1.1;
 const HIGH_SCORE_KEY = "jumpingBlockHighScore";
 const DEFAULT_HIGH_SCORE = 559;
@@ -27,18 +34,16 @@ let highScore = 0;
 let scoredForCurrentBlock = false;
 
 function setMenuOpen(open) {
-    document.body.classList.toggle("menu-open", open);
+    $("body").toggleClass("menu-open", open);
 }
 
 function showOnly(menuToShow) {
-    for (const menu of [startMenu, pauseMenu, gameOverMenu]) {
-        menu.classList.add("hidden");
-        menu.setAttribute("aria-hidden", "true");
-    }
+    $startMenu.add($pauseMenu).add($gameOverMenu)
+        .addClass("hidden")
+        .attr("aria-hidden", "true");
 
     if (menuToShow) {
-        menuToShow.classList.remove("hidden");
-        menuToShow.setAttribute("aria-hidden", "false");
+        menuToShow.removeClass("hidden").attr("aria-hidden", "false");
         setMenuOpen(true);
     } else {
         setMenuOpen(false);
@@ -46,33 +51,77 @@ function showOnly(menuToShow) {
 }
 
 function setGameStopped(stopped) {
-    document.body.classList.toggle("game-stopped", stopped);
-    block.style.animationPlayState = stopped ? "paused" : "running";
+    $("body").toggleClass("game-stopped", stopped);
+    if (blockInFlight) {
+        block.style.animationPlayState = stopped ? "paused" : "running";
+    }
+}
+
+function cancelBlockDelay() {
+    if (blockDelayTimerId !== null) {
+        clearTimeout(blockDelayTimerId);
+        blockDelayTimerId = null;
+    }
+}
+
+// Startet den Block mit zufälliger Geschwindigkeit
+function launchBlock() {
+    blockInFlight = true;
+    // Zufällige Animationsdauer: 0.7 s – 1.5 s
+    blockSpeed = 0.7 + Math.random() * 0.8;
+    block.style.animation = "none";
+    block.style.left = "100%";
+    void block.offsetHeight; // Reflow erzwingen
+    block.style.animation = "block " + blockSpeed + "s linear";
+    block.style.animationPlayState = (isPaused || !isRunning || isResuming) ? "paused" : "running";
+}
+
+// Plant den nächsten Block mit zufälliger Verzögerung ein
+function scheduleNextBlock() {
+    blockInFlight = false;
+    scoredForCurrentBlock = false;
+    cancelBlockDelay();
+    block.style.animation = "none";
+    block.style.left = "100%";
+
+    if (!isRunning || gameOver || isPaused || isResuming) return;
+
+    // Zufällige Verzögerung: 300 ms – 1800 ms
+    const delay = Math.floor(Math.random() * 1500) + 300;
+    blockDelayTimerId = setTimeout(() => {
+        blockDelayTimerId = null;
+        if (!isRunning || gameOver || isPaused || isResuming) return;
+        launchBlock();
+    }, delay);
 }
 
 function setPausedState(paused) {
     isPaused = paused;
-    document.body.classList.toggle("game-paused", paused);
-    block.style.animationPlayState = paused ? "paused" : "running";
+    $("body").toggleClass("game-paused", paused);
+    if (blockInFlight) {
+        block.style.animationPlayState = paused ? "paused" : "running";
+    }
+    if (paused) {
+        cancelBlockDelay();
+    }
 }
 
-function resetBlock() {
+function resetBlockToStart() {
+    cancelBlockDelay();
+    blockInFlight = false;
     scoredForCurrentBlock = false;
     block.style.animation = "none";
     block.style.left = "100%";
-    void block.offsetHeight;
-    block.style.animation = "block " + blockSpeed + "s infinite linear";
-    block.style.animationPlayState = (isPaused || !isRunning || isResuming) ? "paused" : "running";
 }
 
 function overlaps(a, b) {
     const ra = a.getBoundingClientRect();
     const rb = b.getBoundingClientRect();
     return !(
-        ra.right < rb.left ||
-        ra.left > rb.right ||
-        ra.bottom < rb.top ||
-        ra.top > rb.bottom
+        ra.right  < rb.left  ||
+        ra.left   > rb.right ||
+        ra.bottom < rb.top   ||
+        ra.top    > rb.bottom
     );
 }
 
@@ -80,8 +129,8 @@ function resetScore() {
     counter = 0;
     score = 0;
     scoredForCurrentBlock = false;
-    scoreSpan.textContent = "0";
-    finalScoreEl.textContent = "0";
+    $scoreSpan.text("0");
+    $finalScoreEl.text("0");
 }
 
 function loadHighScore() {
@@ -107,8 +156,8 @@ function saveHighScore() {
 
 function updateHighScoreDisplay() {
     const value = String(highScore);
-    if (startHighScoreEl) startHighScoreEl.textContent = value;
-    if (pauseHighScoreEl) pauseHighScoreEl.textContent = value;
+    $startHighScoreEl.text(value);
+    $pauseHighScoreEl.text(value);
 }
 
 function commitHighScore(candidateScore) {
@@ -120,84 +169,94 @@ function commitHighScore(candidateScore) {
         updateHighScoreDisplay();
     }
 }
+
 function awardPointForPassingBlock() {
     if (scoredForCurrentBlock || !isRunning || gameOver || isPaused || isResuming) return;
 
     score += 1;
     counter = score * 100;
     scoredForCurrentBlock = true;
-    scoreSpan.textContent = String(score);
+    $scoreSpan.text(String(score));
     commitHighScore(score);
 }
-
 
 function cancelResumeCountdown() {
     if (resumeTimerId) {
         clearTimeout(resumeTimerId);
         resumeTimerId = null;
     }
-    countdownEl.textContent = "";
-    resumeButton.disabled = false;
+    $countdownEl.text("");
+    $resumeButton.prop("disabled", false);
     isResuming = false;
 }
 
 function stopToStartMenu() {
     cancelResumeCountdown();
+    cancelBlockDelay();
     isRunning = false;
     gameOver = false;
     isPaused = false;
-    document.body.classList.remove("game-paused");
+    $("body").removeClass("game-paused");
     setGameStopped(true);
-    showOnly(startMenu);
+    showOnly($startMenu);
     updateHighScoreDisplay();
-    resetBlock();
+    resetBlockToStart();
     resetScore();
 }
 
 function startGame() {
     cancelResumeCountdown();
+    cancelBlockDelay();
+    resetBlockToStart();
     resetScore();
     gameOver = false;
     isRunning = true;
     isPaused = false;
     isResuming = false;
-    document.body.classList.remove("game-paused");
+    $("body").removeClass("game-paused");
     setGameStopped(false);
     showOnly(null);
-    resetBlock();
     updateHighScoreDisplay();
+    scheduleNextBlock();
 }
 
 function pauseGame() {
     if (!isRunning || gameOver || isPaused || isResuming) return;
-    countdownEl.textContent = "";
+    $countdownEl.text("");
     updateHighScoreDisplay();
     setPausedState(true);
-    showOnly(pauseMenu);
+    showOnly($pauseMenu);
 }
 
 function finishResume() {
     isResuming = false;
-    countdownEl.textContent = "";
-    resumeButton.disabled = false;
+    $countdownEl.text("");
+    $resumeButton.prop("disabled", false);
     showOnly(null);
-    document.body.classList.remove("game-paused");
+    $("body").removeClass("game-paused");
     isPaused = false;
-    setPausedState(false);
+    // Block fortsetzen oder nächsten einplanen
+    if (blockInFlight) {
+        block.style.animationPlayState = "running";
+    } else {
+        scheduleNextBlock();
+    }
 }
 
 function startResumeCountdown() {
     if (!isRunning || gameOver || isResuming || !isPaused) return;
 
     isResuming = true;
-    resumeButton.disabled = true;
+    $resumeButton.prop("disabled", true);
     updateHighScoreDisplay();
-    showOnly(pauseMenu);
-    document.body.classList.add("game-paused");
-    block.style.animationPlayState = "paused";
+    showOnly($pauseMenu);
+    $("body").addClass("game-paused");
+    if (blockInFlight) {
+        block.style.animationPlayState = "paused";
+    }
 
     let secondsLeft = 3;
-    countdownEl.textContent = `Weiter in ${secondsLeft}...`;
+    $countdownEl.text(`Weiter in ${secondsLeft}...`);
 
     const tick = () => {
         secondsLeft -= 1;
@@ -207,7 +266,7 @@ function startResumeCountdown() {
             return;
         }
 
-        countdownEl.textContent = `Weiter in ${secondsLeft}...`;
+        $countdownEl.text(`Weiter in ${secondsLeft}...`);
         resumeTimerId = window.setTimeout(tick, 1000);
     };
 
@@ -215,11 +274,11 @@ function startResumeCountdown() {
 }
 
 function jump() {
-    if (!isRunning || gameOver || isPaused || isResuming || character.classList.contains("jump")) return;
+    if (!isRunning || gameOver || isPaused || isResuming || $character.hasClass("jump")) return;
 
-    character.classList.add("jump");
+    $character.addClass("jump");
     window.setTimeout(() => {
-        character.classList.remove("jump");
+        $character.removeClass("jump");
     }, 450);
 }
 
@@ -229,28 +288,32 @@ function handleGameOver() {
     gameOver = true;
     isRunning = false;
     isPaused = false;
-    isResuming = false; 
+    isResuming = false;
     cancelResumeCountdown();
+    cancelBlockDelay();
     commitHighScore(score);
     setGameStopped(true);
-    document.body.classList.remove("game-paused");
-    finalScoreEl.textContent = String(score);
-    showOnly(gameOverMenu);
+    $("body").removeClass("game-paused");
+    $finalScoreEl.text(String(score));
+    showOnly($gameOverMenu);
 }
 
-game.addEventListener("ArrowUp", jump);
+// Event-Handler mit jQuery
+$startButton.on("click", startGame);
+$resumeButton.on("click", startResumeCountdown);
+$backToStartButton.on("click", stopToStartMenu);
 
-document.addEventListener("keydown", (event) => {
+$(document).on("keydown", (event) => {
     if (event.code === "Space") {
         event.preventDefault();
 
-        if (startMenu && !startMenu.classList.contains("hidden")) {
-            startButton.click();
+        if (!$startMenu.hasClass("hidden")) {
+            $startButton.trigger("click");
             return;
         }
 
-        if (gameOverMenu && !gameOverMenu.classList.contains("hidden")) {
-            backToStartButton.click();
+        if (!$gameOverMenu.hasClass("hidden")) {
+            $backToStartButton.trigger("click");
             return;
         }
 
@@ -277,14 +340,13 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
-startButton.addEventListener("click", startGame);
-resumeButton.addEventListener("click", startResumeCountdown);
-backToStartButton.addEventListener("click", stopToStartMenu);
-
-block.addEventListener("animationiteration", () => {
-    scoredForCurrentBlock = false;
+// Block-Animation beendet: nächsten Block mit Verzögerung einplanen
+$block.on("animationend", () => {
+    if (!isRunning || gameOver) return;
+    scheduleNextBlock();
 });
 
+// Kollisionserkennung und Punktevergabe
 window.setInterval(() => {
     if (!isRunning || gameOver || isPaused || isResuming) return;
 
@@ -305,6 +367,6 @@ window.setInterval(() => {
 loadHighScore();
 updateHighScoreDisplay();
 setGameStopped(true);
-showOnly(startMenu);
-resetBlock();
+showOnly($startMenu);
+resetBlockToStart();
 resetScore();
